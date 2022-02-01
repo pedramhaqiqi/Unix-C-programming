@@ -4,13 +4,29 @@
 #include <stdio.h>
 #include <sys/sysinfo.h>
 #include <sys/utsname.h>
+#include <sys/types.h>
+#include <utmp.h>
+#include <unistd.h>
 
+struct sysinfo systeminfo;
+struct utsname unamept;
+
+typedef struct memory_value{
+  double freeram;
+  double totalram;
+  double freeswap;
+  double totalswap;
+}MemoryValue;
 
 typedef struct cpu_value{
   unsigned long long user;
   unsigned long long nice;
   unsigned long long system;
   unsigned long long idle;
+  unsigned long long iowait;
+  unsigned long long irq;
+  unsigned long long softirq;
+
 } CpuValues;
 
 /* Array of long options that getopt_long() uses for command line parcing*/
@@ -25,22 +41,42 @@ static struct option long_options[] =
             {0, 0, 0, 0} //the struct option requires a the last array to be zeros
           };
 
-struct sysinfo systeminfo;
-struct utsname unamept;
 
-void memory_usage(){
+  CpuValues get_cpu_values(){
+  FILE *fp;
+  CpuValues cpu_values;
+  fp = fopen("/proc/stat", "r");
+  fscanf(fp, "cpu %llu %llu %llu %llu %llu %llu %llu ", &cpu_values.user, &cpu_values.nice,
+                  &cpu_values.system, &cpu_values.idle, &cpu_values.iowait, &cpu_values.irq, &cpu_values.softirq);
+  fclose(fp);
+  return cpu_values;
+}
+
+  MemoryValue get_memory_usage(){
   sysinfo(&systeminfo);
-  double free_ram = (double)(systeminfo.freeram * systeminfo.mem_unit)/((double) (1<<30));
-  double total_ram = (double)(systeminfo.totalram * systeminfo.mem_unit)/((double) (1<<30));
-  double free_swap = (double)(systeminfo.freeswap * systeminfo.mem_unit)/((double) (1<<30));
-  double total_swap =(double)(systeminfo.totalswap * systeminfo.mem_unit)/((double) (1<<30));
+  MemoryValue memory_values;
+  memory_values.freeram = (double)(systeminfo.freeram * systeminfo.mem_unit)/((double) (1<<30)); 
+  memory_values.totalram = (double)(systeminfo.totalram * systeminfo.mem_unit)/((double) (1<<30));
+  memory_values.freeswap = (double)(systeminfo.freeswap * systeminfo.mem_unit)/((double) (1<<30));
+  memory_values.totalswap =(double)(systeminfo.totalswap * systeminfo.mem_unit)/((double) (1<<30));
 
-  printf("### Memory ### (Phys.Used/Tot -- Virtual Used/Tot\n");
-  printf("%0.2lf GB / %0.2lf GB  -- %0.2lf GB / %0.2lf GB\n", total_ram - free_ram, total_ram, total_ram + total_swap - free_swap - free_ram, total_ram+total_swap);
+  return memory_values;
+  
   
 }
 
-void systeminformation()
+void print_memory_usage(MemoryValue memory){
+  double total_ram= memory.totalram;
+  double free_ram=  memory.freeram;
+  double total_swap= memory.totalswap;
+  double free_swap= memory.freeswap;
+
+  printf("%0.2lf GB / %0.2lf GB  -- %0.2lf GB / %0.2lf GB\n", total_ram - free_ram, total_ram,
+                         total_ram + total_swap - free_swap - free_ram, total_ram+total_swap);
+  
+}
+
+void print_sysinfo()
 {
   uname(&unamept);
   char *systemname = unamept.sysname;
@@ -55,21 +91,47 @@ void systeminformation()
   printf("Architecture: %s\n", machinearch);
 }
 
-CpuValues get_cpu_values(){
-  FILE *fp;
-  CpuValues cpu_values;
-  fp = fopen("/proc/stat", "r");
-  fscanf(fp, "cpu %llu %llu %llu %llu", &cpu_values.user, &cpu_values.nice,
-                  &cpu_values.system, &cpu_values.idle );
-  fclose(fp);
-  return cpu_values;
+
+void print_cpu_usage(CpuValues cpu_current1, CpuValues cpu_current2){
+  /*Base cpu sample*/
+  unsigned long long total_1 = cpu_current1.user + cpu_current1.nice  
+                              + cpu_current1.system + cpu_current1.idle 
+                              + cpu_current1.iowait + cpu_current1.irq 
+                              + cpu_current1.softirq;
+  
+  /*delayed cpu sample*/
+  unsigned long long total_2 = cpu_current2.user + cpu_current2.nice  
+                            + cpu_current2.system + cpu_current2.idle 
+                            + cpu_current2.iowait + cpu_current2.irq 
+                            + cpu_current2.softirq;
+  /*change calculation*/
+  unsigned long long effective_total_1 = total_1 - cpu_current1.idle;
+  unsigned long long effective_total_2 = total_2 - cpu_current2.idle;
+  
+  unsigned long long effective_total_change = effective_total_2 - effective_total_1;
+  unsigned long long total_change = total_2 - total_1;
+  printf("Total cpu usage: %0.2lf %%\n ", 100 * (double)effective_total_change/(double)total_change);
 }
 
-void print_cpu_usage(CpuValues cpu_current){
-  unsigned long long total = cpu_current.user + cpu_current.nice + cpu_current.system + cpu_current.idle;
-  unsigned long long effective_total = total - cpu_current.idle;
-  printf("Total cpu usage: %lf %%\n ", 100 * (double)effective_total/(double)total);
+
+void memory_usage_change(MemoryValue memory1, MemoryValue memory2){
+  /*the base sample*/
+  double Used_ram_1 = memory1.totalram -  memory1.freeram;
+  double Used_swap_1 = memory1.totalswap - memory1.freeswap;
+
+  /*the delayed sample*/
+  double Used_ram_2 = memory2.totalram -  memory2.freeram;
+  double Used_swap_2 = memory2.totalswap - memory2.freeswap;
+
+  double difference = (Used_swap_2 + Used_ram_2 - Used_swap_1 - Used_ram_1);
+  if (difference < 0){
+      printf("memory change is 0.00 GB\n");
+  } else{
+    printf("memory change is %0.5lf GB\n", difference);
+  }
+  
 }
+
 
 int* cmd_parsing_function(int argc, char *argv[]) {
   int opt;
@@ -128,33 +190,62 @@ int* cmd_parsing_function(int argc, char *argv[]) {
             printf("%s","ERROR in identifiying command line command, pass read user manual");
             exit(1);
           }
-       
+    }
+  /* Accessing any remaining command line arguments */
+  if (optind < argc)
+    {
+      printf("%s", "non-option ARGV-elements: ");
+      printf("\n");
+      while (optind < argc){
+        printf ("%s\n ", argv[optind++]); }
     }
    return flag_arr;
 }
+
+
 int main(int argc, char **argv){
-    ///////////////////////////////////////////////////////////////////////////////////////////////////
-    ///////////////////////////////////////////////////////////////////////////////////////////////////
-    ///////////////////////////////////////////////////////////////////////////////////////////////////
-    ///////////////////////////////////////////////////////////////////////////////////////////////////
+    
+  /*initializaitons*/
   int *cmd_flags;
+  CpuValues cpu_sample_0;
+  CpuValues cpu_sample_1;
+  MemoryValue memory_sample_0;
+  MemoryValue memory_sample_1;
+
+  /* Base variables used for memory and cpu */
+  memory_sample_0 = get_memory_usage();
+  cpu_sample_0 = get_cpu_values();
+  
+  /*reading Cmd line flag array*/
   cmd_flags = cmd_parsing_function(argc, argv);
    for(int i=0; i<5; i++) {
      printf("%d ", cmd_flags[i]);
   }
   printf("\n");
-  /* Accessing any remaining command line arguments */
-  memory_usage();
-  systeminformation();
-  total_cpu_usage();
+  
+  for (int i=0; i<=5; i++)
+  {
+  /*Terminal escape codes*/
+  printf("\033[2J"); 
+  printf("\e[1;1H");  
 
-  if (optind < argc)
-    {
-      printf("%s", "non-option ARGV-elements: ");
-      printf("\n");
-      while (optind < argc)
-        printf ("%s\n ", argv[optind++]);
-      
-    }
+  /*delayed samples*/
+  sleep(1);
+  memory_sample_1 = get_memory_usage();
+  cpu_sample_1 = get_cpu_values();
+  
+  /*function calls*/
+
+  printf("### Memory ### (Phys.Used/Tot -- Virtual Used/Tot\n");
+  print_memory_usage(memory_sample_0);
+  memory_usage_change(memory_sample_0, memory_sample_1);
+  printf("---------------------------------------\n");
+  print_cpu_usage(cpu_sample_0, cpu_sample_1);
+  printf("---------------------------------------\n");
+  printf("### System Information ###\n");
+  print_sysinfo();
+  printf("---------------------------------------\n");
+  
+  }
   exit (0);
 }

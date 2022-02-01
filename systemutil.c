@@ -3,6 +3,15 @@
 #include <getopt.h>
 #include <stdio.h>
 #include <sys/sysinfo.h>
+#include <sys/utsname.h>
+
+
+typedef struct cpu_value{
+  unsigned long long user;
+  unsigned long long nice;
+  unsigned long long system;
+  unsigned long long idle;
+} CpuValues;
 
 /* Array of long options that getopt_long() uses for command line parcing*/
 static struct option long_options[] =
@@ -17,6 +26,7 @@ static struct option long_options[] =
           };
 
 struct sysinfo systeminfo;
+struct utsname unamept;
 
 void memory_usage(){
   sysinfo(&systeminfo);
@@ -30,13 +40,43 @@ void memory_usage(){
   
 }
 
+void systeminformation()
+{
+  uname(&unamept);
+  char *systemname = unamept.sysname;
+  char *machinename = unamept.nodename;
+  char *releaseinfo = unamept.release;
+  char *versioninfo = unamept.version;
+  char *machinearch = unamept.machine;
+  printf("System Name: %s\n", systemname);
+  printf("Machine Name: %s\n", machinename);
+  printf("Version: %s\n", releaseinfo);
+  printf("Release: %s\n", versioninfo);
+  printf("Architecture: %s\n", machinearch);
+}
+
+CpuValues get_cpu_values(){
+  FILE *fp;
+  CpuValues cpu_values;
+  fp = fopen("/proc/stat", "r");
+  fscanf(fp, "cpu %llu %llu %llu %llu", &cpu_values.user, &cpu_values.nice,
+                  &cpu_values.system, &cpu_values.idle );
+  fclose(fp);
+  return cpu_values;
+}
+
+void print_cpu_usage(CpuValues cpu_current){
+  unsigned long long total = cpu_current.user + cpu_current.nice + cpu_current.system + cpu_current.idle;
+  unsigned long long effective_total = total - cpu_current.idle;
+  printf("Total cpu usage: %lf %%\n ", 100 * (double)effective_total/(double)total);
+}
+
 int* cmd_parsing_function(int argc, char *argv[]) {
   int opt;
   int option_index = 0;
   int *flag_arr;
   flag_arr = (int*) calloc(5, sizeof(int));
  
-
     while ((opt = getopt_long (argc, argv, "g",
                        long_options, &option_index) )!= -1)
       {
@@ -105,7 +145,8 @@ int main(int argc, char **argv){
   printf("\n");
   /* Accessing any remaining command line arguments */
   memory_usage();
-  
+  systeminformation();
+  total_cpu_usage();
 
   if (optind < argc)
     {

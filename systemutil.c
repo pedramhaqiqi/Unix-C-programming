@@ -9,10 +9,11 @@
 #include <unistd.h>
 #include <utmp.h>
 
+/*structs used to populate functions*/
 struct sysinfo systeminfo;
 struct utsname unamept;
 
-
+/*Type defs created to store memory and cpu values easier*/
 typedef struct memory_value {
   double freeram;
   double totalram;
@@ -42,6 +43,7 @@ static struct option long_options[] = {
     {0, 0, 0, 0}  // the struct option requires a the last array to be zeros
 };
 
+/*This Function returns an object of CpuValues that will be used to calculate cpu metrics*/
 CpuValues get_cpu_values() {
   FILE *fp;
   CpuValues cpu_values;
@@ -224,8 +226,8 @@ int *cmd_parsing_function(int argc, char *argv[]) {
   int *flag_arr;
   int arg_given = 0;
   flag_arr = (int *)calloc(7, sizeof(int));
-  flag_arr[5] = 10; //Default value for time delay built in
-  flag_arr[6] = 1;////Default value for sample size built in
+  flag_arr[5] = 10; //Default value for sample size built in
+  flag_arr[6] = 1;  //Default value for time delay built in
 
   while ((opt = getopt_long(argc, argv, "g", long_options, &option_index)) !=
          -1) {

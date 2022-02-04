@@ -361,6 +361,7 @@ int main(int argc, char **argv) {
 
     if ((sys == 1 && uzer == 1) || (sys == 0 && uzer == 0)){
       if (graf == 1){
+        printf("Nbr of samples: %d -- every %d secs\n", sample_size, time_delay);
         printf("---------------------------------------\n");
         printf("### Memory ### (Phys.Used/Tot -- Virtual Used/Tot\n");
         for (int j = 0; j <= i ; j++){
@@ -385,6 +386,7 @@ int main(int argc, char **argv) {
         printf("---------------------------------------\n");
       }
       else{
+        printf("Nbr of samples: %d -- every %d secs\n", sample_size, time_delay);
         printf("---------------------------------------\n");
         printf("### Memory ### (Phys.Used/Tot -- Virtual Used/Tot\n");
         for (int j = 0; j <= i ; j++){
@@ -409,6 +411,7 @@ int main(int argc, char **argv) {
     
     else if (sys == 1){
       if (graf == 1){
+        printf("Nbr of samples: %d -- every %d secs\n", sample_size, time_delay);
         printf("---------------------------------------\n");
         printf("### Memory ### (Phys.Used/Tot -- Virtual Used/Tot\n");
         for (int j = 0; j <= i ; j++){
@@ -429,6 +432,7 @@ int main(int argc, char **argv) {
         print_sysinfo();
       }
       else{
+        printf("Nbr of samples: %d -- every %d secs\n", sample_size, time_delay);
         printf("---------------------------------------\n");
         printf("### Memory ### (Phys.Used/Tot -- Virtual Used/Tot\n");
         for (int j = 0; j <= i ; j++){
@@ -452,6 +456,7 @@ int main(int argc, char **argv) {
         printf("Graphics flag cannot be passed for User only\n");
         exit(1);
       } else{
+        printf("Nbr of samples: %d -- every %d secs\n", sample_size, time_delay);
         printf("---------------------------------------\n");
       printf("### System Information ###\n");
       print_sysinfo();

@@ -9,6 +9,7 @@ Overview:
 This program will output system utilization of the machine the user is currently working on, it runs from the command line and outputs to it. It will report different metrics of the utilization of a given system as described below. Accepted command line argument formats will be discussed later.
 
 --system
+        
         to indicate that only the system usage should be generated
 
 
